@@ -1,0 +1,169 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  8
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     simpleFoam;
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         1;
+
+deltaT          1;
+
+writeControl    timeStep;
+
+writeInterval   50;
+
+purgeWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  6;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable true;
+
+functions
+{
+    TrueSoln
+    {
+        libs ("libutilityFunctionObjects.so");
+        type coded;
+	name TrueSoln;
+        writeControl outputTime;
+	writeInterval 1;
+
+	codeOptions
+	#{
+	    -I$(FOAM_CASE)/system
+	#};
+
+        codeExecute
+        #{
+	    #include "shiCalc.H"
+	  
+            volScalarField pTheor
+            (
+                IOobject
+                (
+                    "pTheor",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+		 ),
+      		((8.0/Re)*(F*gppp+fp*gp)+64.0*F2*(g*gpp-gp*gp))
+		*boxVel*boxVel
+            );
+	    
+            volVectorField UTheor
+            (
+                IOobject
+                (
+                    "UTheor",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh().lookupObject<volVectorField>("U")
+            );
+	    
+	    volScalarField ux = 8.0*f*gp*boxVel.value();
+	    volScalarField uy = -8.0*fp*g*boxVel.value();
+
+	    UTheor.replace(0,ux);
+	    UTheor.replace(1,uy);
+
+
+	    scalar pWeight = pTheor.weightedAverage(mesh().V()).value();
+	    scalar UWeight = magSqr(UTheor)().weightedAverage(mesh().V()).value();
+
+	    const volVectorField& U = mesh().lookupObject<volVectorField>("U");
+	    const volScalarField& p = mesh().lookupObject<volScalarField>("p");
+
+	    volScalarField pErr
+	    (
+	        IOobject
+                (
+		    "pErr",
+		    mesh().time().timeName(),
+		    mesh(),
+		    IOobject::NO_READ,
+		    IOobject::AUTO_WRITE
+		),
+		mag(p-pTheor)/pWeight
+	    );
+
+	    volScalarField UErr
+	    (
+	        IOobject
+		(
+		    "UErr",
+		    mesh().time().timeName(),
+		    mesh(),
+		    IOobject::NO_READ,
+		    IOobject::AUTO_WRITE
+		),
+	        magSqr(U-UTheor)/UWeight
+	    );
+	    
+	    Info << "Errors " 
+		 << mesh().time().timeName() 
+		 << "  " 
+		 << pErr.weightedAverage(mesh().V()).value() 
+		 << "  "
+		 << UErr.weightedAverage(mesh().V()).value()
+		 << endl;
+
+	    if (mesh().time().writeTime())
+	    {
+	        pTheor.write();
+		UTheor.write();
+		pErr.write();
+		UErr.write();
+	    }
+
+        #};
+    }
+ 
+    forces1
+    {
+        type            forces;
+	libs            ("libforces.so");
+	log             true;
+	writeControl    timeStep;
+	writeInterval 1;
+
+	patches         ("movingWall");
+	CofR            (0 0 0);
+        pitchAxis       (0 1 0);
+	rho             rhoInf;
+	rhoInf          1;
+    }
+}
+
+
+// ************************************************************************* //

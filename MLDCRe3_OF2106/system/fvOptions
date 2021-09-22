@@ -1,0 +1,55 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  8
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      fvOptions;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+codedSource
+{
+    type            vectorCodedSource;
+    selectionMode   all;
+    active          on;
+    redirectType    velocitySource;
+
+    fields          (U);
+    name            B;
+
+    codeOptions
+    #{
+        -I$(FOAM_CASE)/system
+    #};
+
+    codeCorrect
+    #{
+      
+    #};
+
+    codeAddSup
+    #{
+        vectorField& BSource = eqn.source();
+	const scalarField& V = mesh().V();
+
+	#include "shiCalc.H"
+
+	BSource = V*(b_y.internalField())*vector(0,1,0);
+       
+    #};
+
+    codeConstrain
+    #{
+
+    #};
+}
+
+// ************************************************************************* //

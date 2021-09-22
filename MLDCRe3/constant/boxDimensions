@@ -1,4 +1,0 @@
-// Set the dimension of the box. If this changes, need to re-run blockMesh
-
-side      1.0;
-res       160;
